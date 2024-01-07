@@ -6,9 +6,9 @@ import random
 import operator
 import math
 
-data = pd.read_csv('data/ice_mask.csv')
-X = data[["x-axis", "y-axis", "precipitation", "air_temp", "ocean_temp", "ocean_salinity"]]
-y = data["ice_mask"]
+data = pd.read_csv('data/ice_thickness.csv')
+X = data[["x-axis", "y-axis", "precipitation", "air_temp", "ocean_temp"]]
+y = data["ice_thickness"]
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 # creating the fitness class. Note the -1.0 in weights, representing that lower fitness vals are better 
@@ -19,8 +19,8 @@ creator.create("Fitness", base.Fitness, weights=(-1.0,))
 creator.create("Individual", gp.PrimitiveTree, fitness=creator.Fitness)
 
 #Defining the terminal set 
-primitives = gp.PrimitiveSet("PrimitiveSet", arity=6)  # arity = max number of unique input arguments for an individual -> unrealted to number of functions, only number of terminals 
-primitives.renameArguments(ARG0='x_axis', ARG1='y_axis', ARG2='precipitation', ARG3='air_temp', ARG4='ocean_temp', ARG5='ocean_salinity')
+primitives = gp.PrimitiveSet("PrimitiveSet", arity=5)  # arity = max number of unique input arguments for an individual -> unrealted to number of functions, only number of terminals 
+primitives.renameArguments(ARG0='x_axis', ARG1='y_axis', ARG2='precipitation', ARG3='air_temp', ARG4='ocean_temp')
 # to change rqange of ERC, change range from -1,1 to whatever you want below vv
 primitives.addEphemeralConstant("EphemeralRandomConstant", lambda: random.randint(-1,1))  #means you can have a terminal constant as part of the tree
 
@@ -58,14 +58,14 @@ toolbox.register("population", tools.initRepeat, list, toolbox.individual)
 #this registers a method to compile, allowing us to evaluate fitness - it compiles the tree into a function that can be called with the given primitives
 toolbox.register("compile", gp.compile, pset=primitives)
 
-# Define the fitness function
+# Define the fitness functions
 def evalFitness(individual, points): #points is the rows in the dataset (each row is a point)
     func = toolbox.compile(expr=individual)     # Convert the tree expression in a callable function
     mse = ((func(*point) - target) ** 2 for point, target in points) #mse between the function and the target values over the given points
     return (math.sqrt(sum(mse) / len(points)), ) #returns the rmse, as a tuple, as the fitness function must return a tuple for DEAP (since it is designed to handle multiple objectives)
 
 # row[:6] extracts the first six elements - x and y axis, precip, ocean temp, air temp, and ocean salinity, and row[6] extracts the 7th element (counting from 0)
-toolbox.register("evaluate", evalFitness, points=[(row[:6], row[6]) for row in X_train.join(y_train).itertuples(index=False)])
+toolbox.register("evaluate", evalFitness, points=[(row[:5], row[5]) for row in X_train.join(y_train).itertuples(index=False)])
 
 #selection, using k tournament selection with k=3
 toolbox.register("select", tools.selTournament, tournsize=3)
