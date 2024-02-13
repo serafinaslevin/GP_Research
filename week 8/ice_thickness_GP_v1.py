@@ -1,21 +1,38 @@
-import pandas as pd
-import numpy as np
-from sklearn.model_selection import train_test_split
-from deap import base, creator, tools, gp, algorithms 
-import random
-import operator
-import math
+#this file will implement GP using DEAP 
+#hopefully we will find an equation that maps the inputs of the climate model to its output of ice thickness
+#at this stage I will be looking at only the first time slice of the model
+#I will also only be looking at the points in the dataset where there IS ice (ice thickness > 0)
 
-data = pd.read_csv('data/ice_thickness.csv')
+from deap import base, creator, tools, gp, algorithms
+import numpy as np
+import pandas as pd
+import operator
+import random
+from sklearn.metrics import mean_squared_error
+import math 
+from math import sqrt, sin, cos, log
+from sklearn.model_selection import train_test_split
+
+
+# inputs: x-axis, y-axis, precipitation, air_temp, ocean_temp
+# output: ice_thickness
+
+
+data = pd.read_csv('data/trimmed_ice_thickness.csv')
 X = data[["x-axis", "y-axis", "precipitation", "air_temp", "ocean_temp"]]
 y = data["ice_thickness"]
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 # creating the fitness class. Note the -1.0 in weights, representing that lower fitness vals are better 
 # the weights tuple is quite important, as it defines the number of objectives to be optimized and weather we want to minimise them or maximise them
-# in this case, we are minimising just one objective, the mean squared error
+# in this case, we are minimising just one objective, the root mean squared error which is calculated in evalFitness
 # base.Fitness means that our fitness function is inheriting the base fitness class from the deap library
 creator.create("Fitness", base.Fitness, weights=(-1.0,))
+
+#creating the individual class. The second parameter gp.PrimitiveTree indicates that our custom individual class is 
+# inheriting the properties of the gp.PrimitiveTree class from the deap library 
+#the third parameter is specifying that our custom individuals will have an attribute named 'fitness'
+#the fitness attribute in the individual will be an instance of the dynamically created class "Fitness" above 
 creator.create("Individual", gp.PrimitiveTree, fitness=creator.Fitness)
 
 #Defining the terminal set 
@@ -32,12 +49,21 @@ def protectedDiv(left, right):
         return 1
 
 
+#protected log function to be used as a primitive 
+    
+def protectedLog(x):
+    try:
+        return log(abs(x))
+    except ZeroDivisionError:
+        return 1
+    
 #Defining the function set
 primitives.addPrimitive(operator.add, 2)
 primitives.addPrimitive(operator.sub, 2)
 primitives.addPrimitive(operator.mul, 2)
 primitives.addPrimitive(protectedDiv, 2) 
 primitives.addPrimitive(operator.neg, 1) #one for negation, to do operations like x-5 or -1
+primitives.addPrimitive(protectedLog, 1) 
 
 
 # Define the toolbox
@@ -64,13 +90,13 @@ def evalFitness(individual, points): #points is the rows in the dataset (each ro
     mse = ((func(*point) - target) ** 2 for point, target in points) #mse between the function and the target values over the given points
     return (math.sqrt(sum(mse) / len(points)), ) #returns the rmse, as a tuple, as the fitness function must return a tuple for DEAP (since it is designed to handle multiple objectives)
 
-# row[:6] extracts the first six elements - x and y axis, precip, ocean temp, air temp, and ocean salinity, and row[6] extracts the 7th element (counting from 0)
+# row[:5] extracts the first five elements - x and y axis, precip, ocean temp, air temp and row[5] extracts the 6th element (counting from 0)
 toolbox.register("evaluate", evalFitness, points=[(row[:5], row[5]) for row in X_train.join(y_train).itertuples(index=False)])
 
-#selection, using k tournament selection with k=3
-toolbox.register("select", tools.selTournament, tournsize=3)
+#selection, using k tournament selection with k=2
+toolbox.register("select", tools.selTournament, tournsize=5)
 
-#mate using one point crossover
+#mate using one point crossover (hence the cxOnePoint)
 toolbox.register("mate", gp.cxOnePoint)
 
 #generates a tree to be used in the mutation (using the full method), with min depth 0 and max depth 2
@@ -89,6 +115,8 @@ stats.register("avg", np.mean)
 stats.register("min", np.min)
 stats.register("max", np.max)
 
+#this line runs the GP, using the population, toolbox, crossover probability, mutation probability, 
+#number of generations, and the stats and hof we defined above
 algorithms.eaSimple(population, toolbox, 0.5, 0.2, 50, stats=stats, halloffame = hof)
 best_ind = hof[0]
 print('Best Individual = ', best_ind)
