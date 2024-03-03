@@ -1,8 +1,4 @@
-#this is a copy of the file from week 8, which I will use to make the following improvements
-# add the r-squared of a model as a second fitness function -> IS THIS STH I CAN DO???
-# print out the r-squared for the best individual 
-# split into training and test sets so I can use the best individual on the test set to get a better idea of how well it performs
-# add a method to print out the best individual in a readable format
+
 
 
 from deap import base, creator, tools, gp, algorithms
@@ -16,11 +12,11 @@ from math import sqrt, sin, cos, log
 from sklearn.model_selection import train_test_split
 
 # Load data
-data = pd.read_csv('data/trimmed_ice_thickness.csv')
+data = pd.read_csv('data/trimmed_ice_velocity.csv')
 
 # Split data into features and target
 X = data[["x-axis", "y-axis", "precipitation", "air_temp", "ocean_temp"]]
-y = data["ice_thickness"]
+y = data["ice_velocity"]
 
 # Perform train-test split
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
@@ -249,6 +245,7 @@ print(f'RMSE on test set (using best individual): {rmse_test}')
  
 import pygraphviz as pgv
 
+
 nodes, edges, labels = gp.graph(best_individual)
 
 g = pgv.AGraph()
@@ -259,5 +256,5 @@ g.layout(prog="dot")
 for i in nodes:
     n = g.get_node(i)
     n.attr["label"] = labels[i]
-g.draw("ice_thickness_tree.pdf")
+g.draw("ice_velocity_tree.pdf")
  
